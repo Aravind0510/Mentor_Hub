@@ -1191,11 +1191,12 @@ def create_aptitude_test():
     
     end_time = data.get('end_time')  # Optional: YYYY-MM-DD HH:MM format
     attempt_limit = data.get('attempt_limit') 
+    violation_limit = data.get('violation_limit', 3) # Default to 3 if not provided
     
     cursor.execute('''
-        INSERT INTO aptitude_tests (mentor_id, title, description, duration, questions, end_time, attempt_limit)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-     RETURNING id''', (session['user_id'], data['title'], data['description'], data['duration'], json_lib.dumps(data['questions']), end_time, attempt_limit))
+        INSERT INTO aptitude_tests (mentor_id, title, description, duration, questions, end_time, attempt_limit, violation_limit)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+     RETURNING id''', (session['user_id'], data['title'], data['description'], data['duration'], json_lib.dumps(data['questions']), end_time, attempt_limit, violation_limit))
     
     conn.commit()
     conn.close()

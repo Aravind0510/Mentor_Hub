@@ -228,7 +228,9 @@
 
         <div class="modal-body" style="flex: 1; overflow-y: auto;">
             <form id="createTestForm">
-                <div class="form-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem;">
+                <!-- Row 1: Title & Core Params -->
+                <div class="form-row"
+                    style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-field">
                         <label><i class="fas fa-heading"></i> Test Title</label>
                         <input type="text" id="testTitle" placeholder="Enter test title..." required>
@@ -245,6 +247,17 @@
                             <option value="3">3 Attempts</option>
                             <option value="">Unlimited</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- Row 2: Security & Scheduling -->
+                <div class="form-row"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-field">
+                        <label><i class="fas fa-exclamation-triangle"></i> Max Tab Switches (Violations)</label>
+                        <input type="number" id="violationLimit" value="3" min="0" placeholder="0 = No limit">
+                        <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">Test
+                            auto-submits if exceeded</small>
                     </div>
                     <div class="form-field">
                         <label><i class="fas fa-calendar-times"></i> End Time</label>
@@ -426,7 +439,8 @@
                     duration,
                     questions,
                     end_time: endTime,
-                    attempt_limit: attemptLimit ? parseInt(attemptLimit) : null
+                    attempt_limit: attemptLimit ? parseInt(attemptLimit) : null,
+                    violation_limit: document.getElementById('violationLimit').value ? parseInt(document.getElementById('violationLimit').value) : 3,
                 })
             });
             const result = await res.json();

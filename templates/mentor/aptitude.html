@@ -275,13 +275,15 @@
 
         <div class="modal-body" style="flex: 1; overflow-y: auto;">
             <form id="createTestForm">
-                <div class="form-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem;">
+                <!-- Row 1: Title & Core Params -->
+                <div class="form-row"
+                    style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-field">
                         <label><i class="fas fa-heading"></i> Test Title</label>
                         <input type="text" id="testTitle" placeholder="Enter test title..." required>
                     </div>
                     <div class="form-field">
-                        <label><i class="fas fa-clock"></i> Duration</label>
+                        <label><i class="fas fa-clock"></i> Duration (mins)</label>
                         <input type="number" id="testDuration" value="30" min="5" max="180" required>
                     </div>
                     <div class="form-field">
@@ -293,8 +295,19 @@
                             <option value="">Unlimited</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- Row 2: Security & Scheduling -->
+                <div class="form-row"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-field">
-                        <label><i class="fas fa-calendar-times"></i> End Time</label>
+                        <label><i class="fas fa-exclamation-triangle"></i> Max Tab Switches (Violations)</label>
+                        <input type="number" id="violationLimit" value="3" min="0" placeholder="0 = No limit">
+                        <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">Test
+                            auto-submits if exceeded</small>
+                    </div>
+                    <div class="form-field">
+                        <label><i class="fas fa-calendar-times"></i> End Time (Deadline)</label>
                         <input type="datetime-local" id="testEndTime">
                     </div>
                 </div>
@@ -509,6 +522,7 @@
         const endTimeInput = document.getElementById('testEndTime').value;
         const endTime = endTimeInput ? endTimeInput.replace('T', ' ') : null;
         const attemptLimit = document.getElementById('attemptLimit').value; // "1", "2", "3" or ""
+        const violationLimit = document.getElementById('violationLimit').value || 3;
 
         try {
             const res = await fetch('/api/aptitude', {
@@ -519,6 +533,8 @@
                     description: desc,
                     duration,
                     questions,
+                    attempt_limit: attemptLimit ? parseInt(attemptLimit) : null,
+                    violation_limit: parseInt(violationLimit),
                     end_time: endTime,
                     attempt_limit: attemptLimit ? parseInt(attemptLimit) : null
                 })
