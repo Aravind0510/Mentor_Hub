@@ -1,0 +1,891 @@
+{% extends "base.html" %}
+
+{% block title %}Aptitude Tests - Mentor Hub{% endblock %}
+
+{% block content %}
+<style>
+    .test-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem;
+        transition: all 0.3s;
+    }
+
+    .test-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .test-card .test-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .test-card .test-meta {
+        display: flex;
+        gap: 1rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .test-card .score-badge {
+        background: linear-gradient(135deg, var(--success-500), var(--success-600));
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    /* Fullscreen Test Mode */
+    .test-fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: var(--bg-primary);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .test-fullscreen .test-header {
+        background: rgba(15, 23, 42, 0.95);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border-color);
+        color: white;
+        padding: 1rem 3rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .test-fullscreen .timer {
+        font-family: 'Monospace', monospace;
+        /* Tech feel for timer */
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-400);
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px solid var(--border-color);
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .test-fullscreen .timer.warning {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger-500);
+        border-color: var(--danger-500);
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    /* --- Exam UI Layout --- */
+    .test-fullscreen {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: var(--bg-primary);
+        overflow: hidden;
+    }
+
+    .test-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    /* Main Question Area */
+    .question-area {
+        flex: 1;
+        padding: 3rem 4rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* Sidebar Palette */
+    .question-sidebar {
+        width: 320px;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+        z-index: 10;
+        box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .sidebar-header {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .palette-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.75rem;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+
+    .palette-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .palette-btn:hover {
+        border-color: var(--primary-500);
+        color: var(--primary-500);
+    }
+
+    .palette-btn.active {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+        box-shadow: 0 4px 6px rgba(99, 102, 241, 0.4);
+    }
+
+    .palette-btn.answered {
+        background: var(--success-500);
+        color: white;
+        border-color: var(--success-500);
+    }
+
+    .palette-btn.marked {
+        background: var(--warning-500);
+        color: white;
+        border-color: var(--warning-500);
+    }
+
+    /* Single Question Styles */
+    .current-question-container {
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .q-header {
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1.5rem;
+    }
+
+    .q-number {
+        font-size: 0.9rem;
+        color: var(--primary-400);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .q-text {
+        font-size: 1.5rem;
+        font-weight: 600;
+        line-height: 1.4;
+        color: var(--text-primary);
+    }
+
+    .q-options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .option-card {
+        padding: 1.25rem 1.5rem;
+        background: var(--bg-card);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+
+    .option-card:hover {
+        background: var(--bg-secondary);
+        border-color: var(--primary-300);
+        transform: translateX(4px);
+    }
+
+    .option-card.selected {
+        background: rgba(99, 102, 241, 0.1);
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 1px var(--primary-500);
+    }
+
+    .opt-circle {
+        width: 28px;
+        height: 28px;
+        border: 2px solid var(--text-muted);
+        border-radius: 50%;
+        margin-right: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 700;
+        flex-shrink: 0;
+        transition: all 0.2s;
+    }
+
+    .option-card.selected .opt-circle {
+        background: var(--primary-500);
+        border-color: var(--primary-500);
+        color: white;
+    }
+
+    .nav-buttons {
+        margin-top: auto;
+        padding-top: 3rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 900px) {
+        .test-body {
+            flex-direction: column;
+        }
+
+        .question-sidebar {
+            display: none;
+            /* Hide sidebar on mobile or move to drawer */
+            width: 100%;
+            position: fixed;
+            bottom: 0;
+            height: 300px;
+        }
+
+        .question-area {
+            padding: 1.5rem;
+        }
+    }
+
+    /* Reset old styles */
+    .test-fullscreen .questions-container,
+    .question-block,
+    .question-content,
+    .question-options,
+    .question-text,
+    .question-number,
+    .option-label,
+    .option-marker {
+        all: unset;
+        display: none;
+        /* Hide old elements to prevent conflict */
+    }
+
+   /* border-color: var(--primary-500);
+    color: white;
+    transform: scale(1.1);
+    }*/
+
+    .test-footer {
+        background: var(--bg-secondary);
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .violation-warning {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--danger-500);
+        color: white;
+        padding: 2rem 3rem;
+        border-radius: 16px;
+        text-align: center;
+        z-index: 10001;
+        animation: shake 0.5s;
+    }
+
+    @keyframes shake {
+
+        0%,
+        100% {
+            transform: translate(-50%, -50%) rotate(0);
+        }
+
+        25% {
+            transform: translate(-50%, -50%) rotate(-2deg);
+        }
+
+        75% {
+            transform: translate(-50%, -50%) rotate(2deg);
+        }
+    }
+
+    /* Security: Disable text selection */
+    .test-fullscreen * {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
+</style>
+
+<div class="dashboard-layout" id="mainLayout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('student_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i> <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('student_assignments') }}" class="nav-link">
+                    <i class="fas fa-code"></i> <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('student_aptitude') }}" class="nav-link active">
+                    <i class="fas fa-clipboard-check"></i> <span>Aptitude Test</span>
+                </a>
+                <a href="{{ url_for('student_submissions') }}" class="nav-link">
+                    <i class="fas fa-history"></i> <span>Submissions</span>
+                </a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Student</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">Logout</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="content-header">
+            <h1><i class="fas fa-clipboard-check"></i> Aptitude Tests</h1>
+            <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+        </header>
+
+        <div class="content-body">
+            <div id="testsList"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem;"></div>
+        </div>
+    </main>
+</div>
+
+<!-- Fullscreen Test Container (Hidden by default) -->
+<!-- Fullscreen Test Container -->
+<div id="testFullscreen" class="test-fullscreen" style="display: none;">
+    <!-- Header -->
+    <div class="test-header">
+        <div>
+            <h2 id="fsTestTitle" style="margin: 0; font-size: 1.25rem;">Test Title</h2>
+            <small id="fsViolationCount" style="opacity: 0.8;"></small>
+        </div>
+        <div class="timer" id="fsTimer">00:00</div>
+    </div>
+
+    <!-- Body: Sidebar + Question -->
+    <div class="test-body">
+        <!-- Sidebar -->
+        <div class="question-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    <i class="fas fa-th"></i> Question Palette
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">
+                    <span id="answeredCount">0</span>/<span id="totalCount">0</span> Answered
+                </div>
+            </div>
+            <div class="palette-grid" id="questionPalette">
+                <!-- Generated via JS -->
+            </div>
+            <button class="btn btn-primary btn-block" onclick="submitTest()" style="margin-top: auto;">
+                <i class="fas fa-paper-plane"></i> Submit Test
+            </button>
+        </div>
+
+        <!-- Main Question Area -->
+        <div class="question-area">
+            <div id="currentQuestionContainer" class="current-question-container">
+                <!-- Single Question Rendered Here -->
+            </div>
+
+            <div class="nav-buttons">
+                <button class="btn btn-secondary" id="btnPrev" onclick="navigateQuestion(-1)">
+                    <i class="fas fa-arrow-left"></i> Previous
+                </button>
+                <button class="btn btn-primary" id="btnNext" onclick="navigateQuestion(1)">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Violation Warning Overlay -->
+<div id="violationOverlay"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10001;">
+    <div class="violation-warning">
+        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+        <h2 id="violationMessage">Warning!</h2>
+        <p id="violationDetail">You left the test window.</p>
+        <button class="btn btn-secondary" onclick="dismissViolation()" style="margin-top: 1rem;">
+            Return to Test
+        </button>
+    </div>
+</div>
+
+<script>
+    let currentTestId = null;
+    let studentAnswers = {};
+    let timerInterval = null;
+    let violationCount = 0;
+    let focusLostCount = 0;
+    let pasteAttempts = 0;
+    let testActive = false;
+    let totalQuestions = 0;
+
+    document.addEventListener('DOMContentLoaded', loadTests);
+
+    async function loadTests() {
+        const container = document.getElementById('testsList');
+        try {
+            const res = await fetch('/api/aptitude');
+            const data = await res.json();
+
+            if (data.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state-icon"><i class="fas fa-clipboard-check"></i></div>
+                        <h3>No tests available</h3>
+                        <p>Your mentor hasn't assigned any aptitude tests yet.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = data.map(test => {
+                const limit = test.attempt_limit;
+                const attempts = test.attempts_taken || 0;
+                const canAttempt = !limit || attempts < limit;
+                const remaining = limit ? (limit - attempts) : 'Unlimited';
+
+                return `
+                <div class="test-card">
+                    <div class="test-title">${test.title}</div>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">${test.description || 'No description'}</p>
+                    <div class="test-meta">
+                        <span><i class="fas fa-clock"></i> ${test.duration} mins</span>
+                        <span><i class="fas fa-redo"></i> Attempts: ${attempts}/${limit || '∞'}</span>
+                    </div>
+                    ${test.my_score !== null ?
+                        `<div class="score-badge" style="margin-bottom: 0.5rem;">
+                            <i class="fas fa-check-circle"></i> Max Score: ${test.my_score}
+                        </div>` : ''
+                    }
+                    ${canAttempt ?
+                        `<button class="btn btn-primary btn-block" onclick="startTest(${test.id}, '${test.title.replace(/'/g, "\\'")}', ${test.duration})">
+                            <i class="fas fa-play"></i> Start Test (${remaining} left)
+                        </button>` :
+                        `<button class="btn btn-secondary btn-block" disabled>
+                            <i class="fas fa-lock"></i> Attempts Exhausted
+                        </button>`
+                    }
+                </div>
+            `}).join('');
+        } catch (e) {
+            container.innerHTML = '<p class="error">Error loading tests</p>';
+        }
+    }
+
+    async function startTest(id, title, duration) {
+        currentTestId = id;
+        studentAnswers = {};
+        violationCount = 0;
+        focusLostCount = 0;
+        pasteAttempts = 0;
+        testActive = true;
+
+        try {
+            const res = await fetch(`/api/aptitude/${id}`);
+            if (res.status === 403) {
+                showToast('error', 'Limit Reached', 'You have exhausted the maximum attempts for this test.');
+                loadTests(); // Refresh to update UI
+                return;
+            }
+            const data = await res.json();
+
+            totalQuestions = data.questions.length;
+
+            // Setup UI
+            document.getElementById('fsTestTitle').textContent = title;
+            document.getElementById('totalCount').textContent = totalQuestions;
+            updateAnsweredCount();
+            updateViolationDisplay();
+
+            renderQuestions(data.questions);
+
+            // Enter fullscreen and show test
+            document.getElementById('mainLayout').style.display = 'none';
+            document.getElementById('testFullscreen').style.display = 'flex';
+
+            enterFullscreen();
+            startTimer(duration * 60);
+            setupSecurityListeners();
+
+        } catch (e) {
+            showToast('error', 'Error', 'Failed to load test');
+        }
+    }
+
+    let allQuestions = [];
+    let currentQuestionIdx = 0;
+
+    function renderQuestions(questions) {
+        allQuestions = questions;
+        currentQuestionIdx = 0;
+        updatePalette();
+        showQuestion(0);
+    }
+
+    function updatePalette() {
+        const palette = document.getElementById('questionPalette');
+        palette.innerHTML = allQuestions.map((_, idx) => {
+            let className = 'palette-btn';
+            if (idx === currentQuestionIdx) className += ' active';
+            else if (studentAnswers[idx] !== undefined) className += ' answered';
+
+            return `<div class="${className}" onclick="showQuestion(${idx})">${idx + 1}</div>`;
+        }).join('');
+    }
+
+    function showQuestion(idx) {
+        currentQuestionIdx = idx;
+        const q = allQuestions[idx];
+        const container = document.getElementById('currentQuestionContainer');
+        const savedAns = studentAnswers[idx];
+
+        container.innerHTML = `
+            <div class="q-header">
+                <span class="q-number">Question ${idx + 1} of ${allQuestions.length}</span>
+                <div class="q-text">${q.text}</div>
+            </div>
+            <div class="q-options">
+                ${q.options.map((opt, optIdx) => `
+                    <div class="option-card ${savedAns === optIdx ? 'selected' : ''}" onclick="selectAnswer(${idx}, ${optIdx})">
+                        <div class="opt-circle">${String.fromCharCode(65 + optIdx)}</div>
+                        <div class="opt-text">${opt}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Update Nav Buttons
+        document.getElementById('btnPrev').disabled = (idx === 0);
+        document.getElementById('btnNext').textContent = (idx === allQuestions.length - 1) ? 'Finish' : 'Next';
+        document.getElementById('btnNext').innerHTML += (idx === allQuestions.length - 1) ? '' : ' <i class="fas fa-arrow-right"></i>';
+
+        // Disable "Finish" button if last question, handled by Submit button in sidebar
+        if (idx === allQuestions.length - 1) {
+            document.getElementById('btnNext').style.display = 'none';
+        } else {
+            document.getElementById('btnNext').style.display = 'flex';
+        }
+
+        updatePalette();
+    }
+
+    function navigateQuestion(step) {
+        const newIdx = currentQuestionIdx + step;
+        if (newIdx >= 0 && newIdx < allQuestions.length) {
+            showQuestion(newIdx);
+        }
+    }
+
+    function selectAnswer(qIdx, optIdx) {
+        studentAnswers[qIdx] = optIdx;
+        updateAnsweredCount();
+        updatePalette();
+        showQuestion(currentQuestionIdx); // Re-render to show selection state
+    }
+
+    function updateAnsweredCount() {
+        document.getElementById('answeredCount').textContent = Object.keys(studentAnswers).length;
+    }
+
+    function updateViolationDisplay() {
+        const el = document.getElementById('fsViolationCount');
+        if (violationCount > 0) {
+            el.textContent = `⚠️ Violations: ${violationCount}`;
+            el.style.color = '#ff6b6b';
+        } else {
+            el.textContent = '';
+        }
+    }
+
+    // ==========================================
+    // SECURITY FEATURES
+    // ==========================================
+
+    function enterFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+    }
+
+    function exitFullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+    }
+
+    function setupSecurityListeners() {
+        // Fullscreen exit detection
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+        // Tab/Window switch detection
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleWindowBlur);
+
+        // Disable copy/paste/cut
+        document.addEventListener('copy', blockEvent, true);
+        document.addEventListener('paste', blockEvent, true);
+        document.addEventListener('cut', blockEvent, true);
+
+        // Disable right-click
+        document.addEventListener('contextmenu', blockEvent, true);
+
+        // Disable keyboard shortcuts
+        document.addEventListener('keydown', handleKeydown, true);
+    }
+
+    function removeSecurityListeners() {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('blur', handleWindowBlur);
+        document.removeEventListener('copy', blockEvent, true);
+        document.removeEventListener('paste', blockEvent, true);
+        document.removeEventListener('cut', blockEvent, true);
+        document.removeEventListener('contextmenu', blockEvent, true);
+        document.removeEventListener('keydown', handleKeydown, true);
+    }
+
+    function handleFullscreenChange() {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && testActive) {
+            recordViolation('Exited fullscreen mode');
+            enterFullscreen(); // Force back to fullscreen
+        }
+    }
+
+    function handleVisibilityChange() {
+        if (document.hidden && testActive) {
+            focusLostCount++;
+            recordViolation('Switched tabs or minimized window');
+        }
+    }
+
+    function handleWindowBlur() {
+        if (testActive) {
+            focusLostCount++;
+            recordViolation('Left the test window');
+        }
+    }
+
+    function blockEvent(e) {
+        if (testActive) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.type === 'paste') {
+                pasteAttempts++;
+                recordViolation('Paste attempt blocked');
+            } else {
+                showToast('warning', 'Blocked', 'This action is not allowed during the test.');
+            }
+            return false;
+        }
+    }
+
+    function handleKeydown(e) {
+        if (!testActive) return;
+
+        // Block common shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            const blockedKeys = ['c', 'v', 'x', 'a', 'p', 's', 'f', 'u'];
+            if (blockedKeys.includes(e.key.toLowerCase())) {
+                e.preventDefault();
+                e.stopPropagation();
+                showToast('warning', 'Blocked', 'Keyboard shortcuts are disabled.');
+                return false;
+            }
+        }
+
+        // Block F12, Escape
+        if (['F12', 'Escape'].includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }
+
+    function recordViolation(reason) {
+        violationCount++;
+        updateViolationDisplay();
+
+        document.getElementById('violationMessage').textContent = 'Warning #' + violationCount;
+        document.getElementById('violationDetail').textContent = reason + '. This has been recorded.';
+        document.getElementById('violationOverlay').style.display = 'block';
+
+        // Auto-dismiss after 3 seconds
+        setTimeout(dismissViolation, 3000);
+    }
+
+    function dismissViolation() {
+        document.getElementById('violationOverlay').style.display = 'none';
+        if (testActive) {
+            enterFullscreen();
+        }
+    }
+
+    // ==========================================
+    // TIMER
+    // ==========================================
+
+    function startTimer(seconds) {
+        if (timerInterval) clearInterval(timerInterval);
+        const timerEl = document.getElementById('fsTimer');
+
+        timerInterval = setInterval(() => {
+            seconds--;
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            // Warning when less than 2 minutes
+            if (seconds <= 120) {
+                timerEl.classList.add('warning');
+            }
+
+            if (seconds <= 0) {
+                clearInterval(timerInterval);
+                showToast('warning', 'Time Up!', 'Auto-submitting your test...');
+                submitTest();
+            }
+        }, 1000);
+    }
+
+    // ==========================================
+    // SUBMIT
+    // ==========================================
+
+    async function submitTest() {
+        testActive = false;
+        if (timerInterval) clearInterval(timerInterval);
+
+        removeSecurityListeners();
+        exitFullscreen();
+
+        try {
+            const res = await fetch(`/api/aptitude/${currentTestId}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    answers: studentAnswers,
+                    violations: violationCount,
+                    focus_lost_count: focusLostCount,
+                    paste_attempts: pasteAttempts
+                })
+            });
+            const result = await res.json();
+
+            // Show result
+            document.getElementById('testFullscreen').style.display = 'none';
+            document.getElementById('mainLayout').style.display = '';
+
+            showToast('success', 'Test Submitted!', `You scored ${result.score}/${result.total} (${Math.round(result.score / result.total * 100)}%)`);
+
+            if (violationCount > 0) {
+                setTimeout(() => {
+                    showToast('warning', 'Violations Recorded', `${violationCount} violation(s) were recorded during your test.`);
+                }, 2000);
+            }
+
+            loadTests();
+        } catch (e) {
+            showToast('error', 'Error', 'Failed to submit test');
+            document.getElementById('testFullscreen').style.display = 'none';
+            document.getElementById('mainLayout').style.display = '';
+        }
+    }
+</script>
+{% endblock %}

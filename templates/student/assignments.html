@@ -1,0 +1,754 @@
+{% extends "base.html" %}
+
+{% block title %}Assignments - Mentor Hub{% endblock %}
+
+{% block extra_css %}
+<style>
+    .problem-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        transition: all var(--transition-fast);
+    }
+
+    .problem-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .problem-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .problem-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .problem-meta {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .problem-body {
+        padding: 1.5rem;
+    }
+
+    .problem-description {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+
+    .problem-footer {
+        padding: 1rem 1.5rem;
+        background: var(--bg-secondary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .violation-warning {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--danger-500);
+        color: white;
+        padding: 2rem 3rem;
+        border-radius: 16px;
+        text-align: center;
+        z-index: 10001;
+        animation: shake 0.5s;
+        box-shadow: 0 0 50px rgba(239, 68, 68, 0.5);
+    }
+
+    @keyframes shake {
+
+        0%,
+        100% {
+            transform: translate(-50%, -50%) rotate(0);
+        }
+
+        25% {
+            transform: translate(-50%, -50%) rotate(-2deg);
+        }
+
+        75% {
+            transform: translate(-50%, -50%) rotate(2deg);
+        }
+    }
+
+    .security-banner {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid var(--danger-500);
+        color: var(--danger-500);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('student_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('student_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('student_assignments') }}" class="nav-link active">
+                    <i class="fas fa-code"></i>
+                    <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('student_aptitude') }}" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Aptitude Test</span>
+                </a>
+                <a href="{{ url_for('student_submissions') }}" class="nav-link">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>My Submissions</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Student</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Coding & SQL Assignments</h1>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <!-- Filters -->
+            <div class="tabs" style="max-width: 400px; margin-bottom: 1.5rem;">
+                <button class="tab-btn active" onclick="filterProblems('all')">All</button>
+                <button class="tab-btn" onclick="filterProblems('coding')">Coding</button>
+                <button class="tab-btn" onclick="filterProblems('sql')">SQL</button>
+            </div>
+
+            <div id="problemsList">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Code Editor Modal -->
+<div class="modal-overlay" id="codeModal">
+    <div class="modal" style="max-width: 900px; max-height: 95vh;">
+        <div class="modal-header">
+            <h2 id="modalProblemTitle">Solve Problem</h2>
+            <button class="modal-close" onclick="closeModal('codeModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+                <div id="problemDetails"></div>
+            </div>
+
+            <div class="tabs" style="margin: 1rem; max-width: 300px;">
+                <button class="tab-btn active" data-tab="codeEditor">
+                    <i class="fas fa-code"></i> Editor
+                </button>
+                <button class="tab-btn" data-tab="codeFile">
+                    <i class="fas fa-upload"></i> Upload
+                </button>
+            </div>
+
+            <div style="padding: 0 1.5rem 1.5rem;">
+                <div class="tab-contents">
+                    <div class="tab-content active" data-tab-content="codeEditor">
+                        <div class="editor-container">
+                            <div class="editor-header">
+                                <div class="language-selector">
+                                    <label>Language:</label>
+                                    <select id="languageSelect" onchange="changeLanguage()">
+                                        <option value="python">Python</option>
+                                        <option value="c">C</option>
+                                        <option value="cpp">C++</option>
+                                        <option value="java">Java</option>
+                                        <option value="sql">SQL</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-sm btn-secondary" id="getHintsBtn" onclick="getHints()">
+                                    <i class="fas fa-lightbulb"></i> Get Hints
+                                </button>
+                            </div>
+                            <div id="monacoEditor" class="monaco-wrapper"></div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" data-tab-content="codeFile">
+                        <div class="file-upload" id="codeFileUpload">
+                            <input type="file" id="codeFile" accept=".py,.c,.cpp,.java,.sql,.txt">
+                            <div class="file-upload-icon">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="file-upload-text">
+                                <span>Click to upload</span> your code file
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hints Section -->
+                <div id="hintsSection"
+                    style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.3);">
+                    <h4 style="margin-bottom: 0.5rem; color: var(--primary-500);">
+                        <i class="fas fa-lightbulb"></i> Hints
+                    </h4>
+                    <div id="hintsContent"></div>
+                </div>
+
+                <!-- Submission Result -->
+                <div id="codeSubmissionResult" style="display: none;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('codeModal'); exitFullscreen();">Cancel</button>
+            <button class="btn btn-primary" onclick="submitCode()" id="submitCodeBtn">
+                <i class="fas fa-paper-plane"></i> Submit for Evaluation
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Violation Warning Overlay -->
+<div id="violationOverlay"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10001;">
+    <div class="violation-warning">
+        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+        <h2 id="violationMessage">Warning!</h2>
+        <p id="violationDetail">Violation detected.</p>
+        <button class="btn btn-secondary" onclick="dismissViolation()" style="margin-top: 1rem;">
+            Return to Problem
+        </button>
+    </div>
+</div>
+
+<!-- Monaco Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+<script>
+    let currentProblemId = null;
+    let currentProblemType = null;
+    let monacoEditor = null;
+    let allProblems = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadProblems();
+        initMonacoEditor();
+        initTabs();
+        initFileUpload();
+
+        // Global Constraints Listeners
+        document.addEventListener('paste', handlePaste, true);
+        document.addEventListener('copy', handleSecurityEvent, true);
+        document.addEventListener('cut', handleSecurityEvent, true);
+        document.addEventListener('contextmenu', handleSecurityEvent, true);
+        document.addEventListener('keydown', handleKeydown, true);
+        window.addEventListener('blur', handleWindowBlur);
+    });
+
+    function handleSecurityEvent(e) {
+        if (!currentProblemId) return;
+        if (window.currentProblemConstraints && window.currentProblemConstraints.block_paste) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.type === 'copy' || e.type === 'cut') {
+                showToast('warning', 'Blocked', 'Copying is disabled for this problem.');
+            }
+            return false;
+        }
+    }
+
+    function handlePaste(e) {
+        if (!currentProblemId) return;
+        if (window.currentProblemConstraints && window.currentProblemConstraints.block_paste) {
+            window.pasteAttemptCount = (window.pasteAttemptCount || 0) + 1;
+            e.preventDefault();
+            e.stopPropagation();
+            recordViolation('Paste attempt blocked');
+            return false;
+        }
+    }
+
+    function handleKeydown(e) {
+        if (!currentProblemId) return;
+        if (window.currentProblemConstraints && window.currentProblemConstraints.block_paste) {
+            if (e.ctrlKey || e.metaKey) {
+                const blocked = ['v', 'c', 'x', 'a'];
+                if (blocked.includes(e.key.toLowerCase())) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+        }
+    }
+
+    function handleWindowBlur() {
+        if (!currentProblemId) return;
+        if (window.currentProblemConstraints && window.currentProblemConstraints.track_focus) {
+            window.focusLostCount = (window.focusLostCount || 0) + 1;
+            recordViolation('Focus lost! Left the problem window.');
+        }
+    }
+
+    // --- Full Screen Logic ---
+    function enterFullscreen() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log('Fullscreen denied:', err));
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+        }
+    }
+
+    function exitFullscreen() {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+        if (currentProblemId && window.currentProblemConstraints && window.currentProblemConstraints.track_focus) {
+            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+            // If we are NOT in fullscreen, and the modal is OPEN
+            if (!isFullscreen && document.getElementById('codeModal').classList.contains('active')) {
+                window.focusLostCount = (window.focusLostCount || 0) + 1;
+                recordViolation('Exited fullscreen mode');
+                // Optional: Force back to fullscreen? (Might be annoying/aggressive, simply warning is usually standard)
+                // enterFullscreen(); 
+            }
+        }
+    });
+    // -------------------------
+
+    function recordViolation(reason) {
+        const total = (window.focusLostCount || 0) + (window.pasteAttemptCount || 0);
+        document.getElementById('violationMessage').textContent = 'Violation #' + total;
+        document.getElementById('violationDetail').textContent = reason;
+        document.getElementById('violationOverlay').style.display = 'block';
+
+        // Shake modal if active
+        const modal = document.querySelector('#codeModal .modal');
+        if (modal) {
+            modal.style.animation = 'none';
+            modal.offsetHeight; // trigger reflow
+            modal.style.animation = 'shake 0.5s';
+        }
+
+        setTimeout(dismissViolation, 3000);
+    }
+
+    function dismissViolation() {
+        document.getElementById('violationOverlay').style.display = 'none';
+        // Re-enter fullscreen if dismissed and we are tracking focus
+        if (currentProblemId && window.currentProblemConstraints.track_focus) {
+            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+            if (!isFullscreen) enterFullscreen();
+        }
+    }
+
+    function initMonacoEditor() {
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            monacoEditor = monaco.editor.create(document.getElementById('monacoEditor'), {
+                value: '# Write your code here\n',
+                language: 'python',
+                theme: window.EditorTheme.getMonacoTheme(),
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                wordWrap: 'on'
+            });
+        });
+    }
+
+    async function loadProblems() {
+        const container = document.getElementById('problemsList');
+
+        try {
+            const response = await fetch('/api/problems');
+            allProblems = await response.json();
+
+            renderProblems(allProblems);
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load problems</p>';
+        }
+    }
+
+    function filterProblems(type) {
+        document.querySelectorAll('.tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        if (type === 'all') {
+            renderProblems(allProblems);
+        } else {
+            renderProblems(allProblems.filter(p => p.problem_type === type));
+        }
+    }
+
+    function renderProblems(problems) {
+        const container = document.getElementById('problemsList');
+
+        if (problems.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fas fa-code"></i></div>
+                <h3>No problems available</h3>
+                <p>Your mentor hasn't uploaded any problems yet.</p>
+            </div>
+        `;
+            return;
+        }
+
+        container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+            ${problems.map(problem => `
+                <div class="problem-card">
+                    <div class="problem-header">
+                        <div class="problem-title">${problem.title}</div>
+                        <div class="problem-meta">
+                            <span class="type-badge ${problem.problem_type}">
+                                <i class="fas fa-${problem.problem_type === 'coding' ? 'code' : 'database'}"></i>
+                                ${problem.problem_type}
+                            </span>
+                            <span class="difficulty-badge ${problem.difficulty}">${problem.difficulty}</span>
+                            ${problem.language ? `<span class="type-badge coding">${problem.language.toUpperCase()}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="problem-body">
+                        <p class="problem-description">${truncateText(problem.description, 120)}</p>
+                    </div>
+                    <div class="problem-footer">
+                        ${problem.submitted > 0 ? '<span class="status-badge accepted">Submitted</span>' : '<span class="status-badge pending">Not Solved</span>'}
+                        <button class="btn btn-primary btn-sm" onclick="openCodeModal(${problem.id})">
+                            <i class="fas fa-code"></i> Solve
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    }
+
+    async function openCodeModal(problemId) {
+        currentProblemId = problemId;
+        document.getElementById('hintsSection').style.display = 'none';
+        document.getElementById('codeSubmissionResult').style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/problems/${problemId}`);
+            const problem = await response.json();
+
+            // Handle Constraints - Default to STRICT if not specified
+            window.currentProblemConstraints = {
+                block_paste: true,
+                track_focus: true,
+                disable_hints: false
+            };
+
+            window.focusLostCount = 0;
+            window.pasteAttemptCount = 0;
+
+            if (problem.constraints) {
+                try {
+                    const dbConstraints = JSON.parse(problem.constraints);
+                    // Merge DB constraints overriding defaults
+                    window.currentProblemConstraints = { ...window.currentProblemConstraints, ...dbConstraints };
+                } catch (e) { }
+            }
+
+            // Enforce Full Screen if tracking focus
+            if (window.currentProblemConstraints.track_focus) {
+                enterFullscreen();
+            }
+
+            const getHintsBtn = document.getElementById('getHintsBtn');
+            if (getHintsBtn) {
+                getHintsBtn.style.display = window.currentProblemConstraints.disable_hints ? 'none' : 'inline-flex';
+            }
+
+            currentProblemType = problem.problem_type;
+
+            document.getElementById('modalProblemTitle').textContent = problem.title;
+
+            // Build details with Security Banner
+            let securityBanner = '';
+            if (window.currentProblemConstraints.track_focus || window.currentProblemConstraints.block_paste) {
+                securityBanner = `
+                <div class="security-banner">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>
+                        <strong>Exam Mode Active:</strong> 
+                        ${window.currentProblemConstraints.track_focus ? 'Focus Tracking On' : ''}
+                        ${(window.currentProblemConstraints.track_focus && window.currentProblemConstraints.block_paste) ? ' • ' : ''}
+                        ${window.currentProblemConstraints.block_paste ? 'Copy/Paste Disabled' : ''}
+                    </span>
+                </div>`;
+            }
+
+            document.getElementById('problemDetails').innerHTML = `
+            ${securityBanner}
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                <span class="type-badge ${problem.problem_type}">
+                    <i class="fas fa-${problem.problem_type === 'coding' ? 'code' : 'database'}"></i>
+                    ${problem.problem_type}
+                </span>
+                <span class="difficulty-badge ${problem.difficulty}">${problem.difficulty}</span>
+            </div>
+            <p style="color: var(--text-secondary); line-height: 1.7;">${problem.description}</p>
+            ${problem.test_cases ? `<p style="margin-top: 1rem;"><strong>Example:</strong> ${problem.test_cases}</p>` : ''}
+            ${problem.expected_output && problem.problem_type !== 'sql' ? `<p><strong>Expected Output:</strong> ${problem.expected_output}</p>` : ''}
+        `;
+
+            // Set language
+            const langSelect = document.getElementById('languageSelect');
+            if (problem.problem_type === 'sql') {
+                langSelect.value = 'sql';
+            } else if (problem.language) {
+                langSelect.value = problem.language;
+            }
+            changeLanguage();
+
+            // Reset editor
+            if (monacoEditor) {
+                const defaultCode = getDefaultCode(langSelect.value);
+                monacoEditor.setValue(defaultCode);
+            }
+
+            openModal('codeModal');
+        } catch (error) {
+            console.error(error);
+            showToast('error', 'Error', 'Failed to load problem details');
+        }
+    }
+
+    function getDefaultCode(language) {
+        const templates = {
+            python: '# Write your Python code here\n\ndef solution():\n    pass\n\n# Call your solution\nsolution()',
+            c: '#include <stdio.h>\n\nint main() {\n    // Write your C code here\n    return 0;\n}',
+            cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your C++ code here\n    return 0;\n}',
+            java: 'public class Solution {\n    public static void main(String[] args) {\n        // Write your Java code here\n    }\n}',
+            sql: '-- Write your SQL query here\nSELECT * FROM table_name;'
+        };
+        return templates[language] || '// Write your code here';
+    }
+
+    function changeLanguage() {
+        const language = document.getElementById('languageSelect').value;
+        if (monacoEditor) {
+            // Update Monaco editor language mode
+            const langMap = {
+                'python': 'python',
+                'c': 'c',
+                'cpp': 'cpp',
+                'java': 'java',
+                'sql': 'sql'
+            };
+            monaco.editor.setModelLanguage(monacoEditor.getModel(), langMap[language] || language);
+            monacoEditor.updateOptions({ theme: window.EditorTheme.getMonacoTheme() });
+
+            // Update the code template to match the selected language
+            const currentCode = monacoEditor.getValue().trim();
+            const isDefaultCode = isDefaultTemplate(currentCode);
+
+            if (isDefaultCode) {
+                monacoEditor.setValue(getDefaultCode(language));
+            }
+        }
+    }
+
+    function isDefaultTemplate(code) {
+        // Check if the code is one of the default templates
+        const defaults = [
+            '# Write your Python code here',
+            '#include <stdio.h>',
+            '#include <iostream>',
+            'public class Solution',
+            '-- Write your SQL query here',
+            '// Write your code here'
+        ];
+        return defaults.some(d => code.includes(d)) || code === '';
+    }
+
+    async function getHints() {
+        const hintsSection = document.getElementById('hintsSection');
+        const hintsContent = document.getElementById('hintsContent');
+
+        hintsSection.style.display = 'block';
+        hintsContent.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting hints...';
+
+        try {
+            const code = monacoEditor ? monacoEditor.getValue() : '';
+            const language = document.getElementById('languageSelect').value;
+
+            const response = await fetch('/api/hints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    problem_id: currentProblemId,
+                    code: code,
+                    language: language
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                hintsContent.innerHTML = `<p style="white-space: pre-wrap; line-height: 1.6;">${result.hints}</p>`;
+            } else {
+                hintsContent.innerHTML = `<p>${result.message || 'Unable to get hints at this time.'}</p>`;
+            }
+        } catch (error) {
+            hintsContent.innerHTML = '<p>Failed to get hints. Please check your connection and try again.</p>';
+        }
+    }
+
+    function runCode() {
+        const code = monacoEditor ? monacoEditor.getValue() : '';
+        showToast('info', 'Running Code', 'Code execution simulated. Submit for full evaluation.');
+    }
+
+    async function submitCode() {
+        const submitBtn = document.getElementById('submitCodeBtn');
+        const resultDiv = document.getElementById('codeSubmissionResult');
+
+        let code = '';
+        let submissionType = 'editor';
+
+        // Check if file is uploaded first
+        const fileInput = document.getElementById('codeFile');
+        if (fileInput && fileInput.files.length > 0) {
+            // Use uploaded file
+            const file = fileInput.files[0];
+            code = await file.text();
+            submissionType = 'file';
+        } else {
+            // Use editor code
+            code = monacoEditor ? monacoEditor.getValue() : '';
+            if (!code.trim()) {
+                showToast('error', 'Error', 'Please write code in the editor or upload a file');
+                return;
+            }
+        }
+
+        const language = document.getElementById('languageSelect').value;
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Evaluating...';
+
+        try {
+            const response = await fetch('/api/submit-problem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    problem_id: currentProblemId,
+                    code: code,
+                    language: language,
+                    submission_type: submissionType,
+                    focus_lost_count: window.focusLostCount || 0,
+                    paste_attempts: window.pasteAttemptCount || 0
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = `submission-result ${result.status}`;
+                resultDiv.innerHTML = `
+                <div class="result-header">
+                    <div class="result-icon">
+                        <i class="fas fa-${result.status === 'accepted' ? 'check' : 'times'}"></i>
+                    </div>
+                    <div>
+                        <div class="result-title">${result.status === 'accepted' ? 'Accepted!' : 'Rejected'}</div>
+                    </div>
+                </div>
+                <div class="result-score">${result.score}/100</div>
+                <div class="result-feedback">${result.feedback}</div>
+            `;
+
+                showToast(result.status === 'accepted' ? 'success' : 'error',
+                    result.status === 'accepted' ? 'Solution Accepted!' : 'Solution Rejected',
+                    `Score: ${result.score}/100`);
+
+                // Refresh problems to show submitted status
+                loadProblems();
+
+                // Exit fullscreen on success? No, let them close it manually or stay.
+            } else {
+                showToast('error', 'Error', result.message || 'Submission failed');
+            }
+        } catch (error) {
+            showToast('error', 'Error', 'Failed to submit solution');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit for Evaluation';
+        }
+    }
+</script>
+{% endblock %}

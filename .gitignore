@@ -1,0 +1,40 @@
+# Environment variables
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+migration_debug.log
+test_out.log
+
+# Uploads
+uploads/
+static/uploads/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Temp/Debug files
+students_debug.txt
+get_creds.py
+test_groq.py
+debug_anushree.py
+database_export.json
+check_schema.py

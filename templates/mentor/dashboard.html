@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Mentor Dashboard - Mentor Hub{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('mentor_dashboard') }}" class="nav-link active">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('mentor_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('mentor_problems') }}" class="nav-link">
+                    <i class="fas fa-code"></i>
+                    <span>Problems</span>
+                </a>
+                <a href="{{ url_for('mentor_aptitude') }}" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Aptitude Test</span>
+                </a>
+                <a href="{{ url_for('mentor_leaderboard') }}" class="nav-link">
+                    <i class="fas fa-trophy"></i>
+                    <span>Leaderboard</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" style="background: var(--gradient-info);">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Mentor</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Mentor Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <!-- Stats Grid -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalStudents">-</div>
+                        <div class="stat-label">Total Students</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalTasks">-</div>
+                        <div class="stat-label">Tasks Created</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalProblems">-</div>
+                        <div class="stat-label">Problems Created</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon info">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalSubmissions">-</div>
+                        <div class="stat-label">Total Submissions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalAptitude">-</div>
+                        <div class="stat-label">Aptitude Tests</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+                <!-- Skill Distribution -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-radar"></i> Class Skill Distribution</h2>
+                    </div>
+                    <div class="card-body"
+                        style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                        <canvas id="skillsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Submissions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-history"></i> Recent Submissions</h2>
+                        <a href="{{ url_for('mentor_leaderboard') }}" class="btn btn-sm btn-secondary">View All</a>
+                    </div>
+                    <div class="card-body" id="recentSubmissions">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Students -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-users"></i> My Students</h2>
+                    </div>
+                    <div class="card-body" id="myStudents">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        loadStats();
+        loadRecentSubmissions();
+        loadMyStudents();
+        loadSkillsChart();
+    });
+
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/stats/dashboard');
+            const stats = await response.json();
+
+            document.getElementById('totalStudents').textContent = stats.total_students || 0;
+            document.getElementById('totalTasks').textContent = stats.tasks_created || 0;
+            document.getElementById('totalProblems').textContent = stats.problems_created || 0;
+            document.getElementById('totalSubmissions').textContent = stats.total_submissions || 0;
+
+            document.getElementById('totalAptitude').textContent = stats.aptitude_created || 0;
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    async function loadSkillsChart() {
+        const ctx = document.getElementById('skillsChart').getContext('2d');
+        try {
+            const response = await fetch('/api/skills');
+            const data = await response.json();
+
+            // Check if we have data (non-zero)
+            const hasData = Object.values(data).some(val => val > 0);
+
+            if (!hasData) {
+                // Render empty state if no data
+                document.getElementById('skillsChart').parentNode.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="font-size: 2rem;"><i class="fas fa-chart-pie"></i></div>
+                        <p>Not enough data yet</p>
+                    </div>`;
+                return;
+            }
+
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Correctness', 'Efficiency', 'Code Style', 'Best Practices'],
+                    datasets: [{
+                        label: 'Class Average',
+                        data: [data.correctness, data.efficiency, data.code_style, data.best_practices],
+                        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                        borderColor: '#6366f1',
+                        pointBackgroundColor: '#6366f1',
+                        borderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                display: false,
+                                stepSize: 20
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            angleLines: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            pointLabels: {
+                                color: '#94a3b8',
+                                font: {
+                                    size: 11,
+                                    family: "'Inter', sans-serif"
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.formattedValue + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error("Chart error", e);
+        }
+    }
+
+    async function loadRecentSubmissions() {
+        const container = document.getElementById('recentSubmissions');
+
+        try {
+            const [taskRes, problemRes] = await Promise.all([
+                fetch('/api/task-submissions'),
+                fetch('/api/problem-submissions')
+            ]);
+
+            const taskSubmissions = await taskRes.json();
+            const problemSubmissions = await problemRes.json();
+
+            const allSubmissions = [
+                ...taskSubmissions.map(s => ({ ...s, type: 'task' })),
+                ...problemSubmissions.map(s => ({ ...s, type: 'problem' }))
+            ].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)).slice(0, 5);
+
+            if (allSubmissions.length === 0) {
+                container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-inbox"></i></div>
+                    <h3>No submissions yet</h3>
+                    <p>Your students haven't submitted anything yet.</p>
+                </div>
+            `;
+                return;
+            }
+
+            container.innerHTML = `
+            <div class="leaderboard-list">
+                ${allSubmissions.map(sub => `
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank" style="background: ${sub.status === 'accepted' ? 'var(--gradient-success)' : 'var(--gradient-danger)'}; color: white; width: 32px; height: 32px; font-size: 0.875rem;">
+                            <i class="fas fa-${sub.status === 'accepted' ? 'check' : 'times'}"></i>
+                        </div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${sub.student_name}</div>
+                            <div class="leaderboard-stats">
+                                ${sub.task_title || sub.problem_title} 
+                                ${sub.type === 'problem' && sub.is_plagiarized ? '<span style="color: var(--danger-500); margin-left: 0.25rem;"><i class="fas fa-exclamation-triangle"></i> Plagiarized</span>' : ''}
+                                • ${formatTimeAgo(sub.submitted_at)}
+                            </div>
+                        </div>
+                        <div class="leaderboard-score">
+                            <div class="score">${sub.score}</div>
+                            <div class="label">Score</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load submissions</p>';
+        }
+    }
+
+
+    async function loadMyStudents() {
+        const container = document.getElementById('myStudents');
+
+        try {
+            const response = await fetch('/api/mentor-students');
+            const students = await response.json();
+
+            if (students.length === 0) {
+                container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+                    <h3>No students assigned</h3>
+                    <p>Contact admin to assign students.</p>
+                </div>
+            `;
+                return;
+            }
+
+            container.innerHTML = `
+            <div class="leaderboard-list">
+                ${students.map((student, index) => `
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank">${index + 1}</div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${student.name}</div>
+                            <div class="leaderboard-stats">${student.email}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load students</p>';
+        }
+    }
+</script>
+{% endblock %}

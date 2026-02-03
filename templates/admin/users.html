@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Mentor Hub{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('admin_users') }}" class="nav-link active">
+                    <i class="fas fa-users"></i>
+                    <span>Users</span>
+                </a>
+                <a href="{{ url_for('admin_mentors') }}" class="nav-link">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Mentor Leaderboard</span>
+                </a>
+                <a href="{{ url_for('admin_students') }}" class="nav-link">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Student Leaderboard</span>
+                </a>
+                <div class="nav-section-title" style="margin-top: 1rem;">Content</div>
+                <a href="{{ url_for('admin_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('admin_problems') }}" class="nav-link">
+                    <i class="fas fa-code"></i>
+                    <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('admin_aptitude') }}" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Aptitude Test</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" style="background: var(--gradient-danger);">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Admin</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Manage Users</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="openModal('createUserModal')">
+                    <i class="fas fa-user-plus"></i> Add User
+                </button>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <!-- User Filters -->
+            <div class="tabs" style="max-width: 400px; margin-bottom: 1.5rem;">
+                <button class="tab-btn active" onclick="filterUsers('all')">All</button>
+                <button class="tab-btn" onclick="filterUsers('admin')">Admins</button>
+                <button class="tab-btn" onclick="filterUsers('mentor')">Mentors</button>
+                <button class="tab-btn" onclick="filterUsers('student')">Students</button>
+            </div>
+
+            <!-- Users Table -->
+            <div class="card">
+                <div class="card-body table-container" id="usersTable">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="createUserModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add New User</h2>
+            <button class="modal-close" onclick="closeModal('createUserModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="createUserForm">
+                <div class="form-field">
+                    <label>Full Name</label>
+                    <input type="text" id="userName" placeholder="Enter full name" required>
+                </div>
+                <div class="form-field">
+                    <label>Email Address</label>
+                    <input type="email" id="userEmail" placeholder="Enter email address" required>
+                </div>
+                <div class="form-field">
+                    <label>Password</label>
+                    <input type="password" id="userPassword" placeholder="Enter password" required>
+                </div>
+                <div class="form-field">
+                    <label>Role</label>
+                    <select id="userRole" onchange="toggleMentorSelect()">
+                        <option value="student">Student</option>
+                        <option value="mentor">Mentor</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-field" id="mentorSelectField">
+                    <label>Assign to Mentor</label>
+                    <select id="userMentor">
+                        <option value="">Select Mentor</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createUser()">
+                <i class="fas fa-user-plus"></i> Create User
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allUsers = [];
+    let mentors = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadUsers();
+        loadMentors();
+    });
+
+    async function loadUsers() {
+        const container = document.getElementById('usersTable');
+
+        try {
+            const response = await fetch('/api/users');
+            allUsers = await response.json();
+
+            renderUsers(allUsers);
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load users</p>';
+        }
+    }
+
+    async function loadMentors() {
+        try {
+            const response = await fetch('/api/mentors');
+            mentors = await response.json();
+
+            const select = document.getElementById('userMentor');
+            select.innerHTML = '<option value="">Select Mentor</option>' +
+                mentors.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+        } catch (error) {
+            console.error('Error loading mentors:', error);
+        }
+    }
+
+    function filterUsers(role) {
+        document.querySelectorAll('.tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        if (role === 'all') {
+            renderUsers(allUsers);
+        } else {
+            renderUsers(allUsers.filter(u => u.role === role));
+        }
+    }
+
+    function renderUsers(users) {
+        const container = document.getElementById('usersTable');
+
+        if (users.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+                <h3>No users found</h3>
+            </div>
+        `;
+            return;
+        }
+
+        container.innerHTML = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Mentor</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${users.map(user => `
+                    <tr>
+                        <td><strong>${user.name}</strong></td>
+                        <td>${user.email}</td>
+                        <td>
+                            <span class="role-badge ${user.role}">${user.role}</span>
+                        </td>
+                        <td>${user.mentor_name || '-'}</td>
+                        <td>${formatDate(user.created_at)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})" ${user.role === 'admin' ? 'disabled' : ''}>
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    }
+
+    function toggleMentorSelect() {
+        const role = document.getElementById('userRole').value;
+        const mentorField = document.getElementById('mentorSelectField');
+        mentorField.style.display = role === 'student' ? 'block' : 'none';
+    }
+
+    async function createUser() {
+        const name = document.getElementById('userName').value;
+        const email = document.getElementById('userEmail').value;
+        const password = document.getElementById('userPassword').value;
+        const role = document.getElementById('userRole').value;
+        const mentorId = document.getElementById('userMentor').value;
+
+        if (!name || !email || !password) {
+            showToast('error', 'Error', 'Please fill in all required fields');
+            return;
+        }
+
+        if (role === 'student' && !mentorId) {
+            showToast('error', 'Error', 'Please select a mentor for the student');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    email,
+                    password,
+                    role,
+                    mentor_id: role === 'student' ? parseInt(mentorId) : null
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('success', 'Success', 'User created successfully');
+                closeModal('createUserModal');
+                document.getElementById('createUserForm').reset();
+                loadUsers();
+                if (role === 'mentor') loadMentors();
+            } else {
+                showToast('error', 'Error', result.message || 'Failed to create user');
+            }
+        } catch (error) {
+            showToast('error', 'Error', 'Failed to create user');
+        }
+    }
+
+    async function deleteUser(userId) {
+        if (!await confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('success', 'Success', 'User deleted successfully');
+                loadUsers();
+            } else {
+                showToast('error', 'Error', result.message || 'Failed to delete user');
+            }
+        } catch (error) {
+            showToast('error', 'Error', 'Failed to delete user');
+        }
+    }
+</script>
+{% endblock %}

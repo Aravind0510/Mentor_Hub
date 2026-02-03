@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Mentor Leaderboard - Mentor Hub{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('admin_users') }}" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Users</span>
+                </a>
+                <a href="{{ url_for('admin_mentors') }}" class="nav-link active">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Mentor Leaderboard</span>
+                </a>
+                <a href="{{ url_for('admin_students') }}" class="nav-link">
+                    <i class="fas fa-user-graduate"></i>
+                    <span>Student Leaderboard</span>
+                </a>
+                <div class="nav-section-title" style="margin-top: 1rem;">Content</div>
+                <a href="{{ url_for('admin_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('admin_problems') }}" class="nav-link">
+                    <i class="fas fa-code"></i>
+                    <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('admin_aptitude') }}" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Aptitude Test</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" style="background: var(--gradient-danger);">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Admin</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Mentor Leaderboard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <!-- Mentor Rankings -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-header">
+                    <h2><i class="fas fa-trophy"></i> Mentor Rankings</h2>
+                </div>
+                <div class="card-body" id="mentorLeaderboard">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Mentor Stats -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-chart-bar"></i> Detailed Statistics</h2>
+                </div>
+                <div class="card-body table-container" id="mentorStats">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        loadMentorLeaderboard();
+    });
+
+    async function loadMentorLeaderboard() {
+        const leaderboardContainer = document.getElementById('mentorLeaderboard');
+        const statsContainer = document.getElementById('mentorStats');
+
+        try {
+            const response = await fetch('/api/leaderboard/mentors');
+            const mentors = await response.json();
+
+            if (mentors.length === 0) {
+                leaderboardContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                    <h3>No mentors yet</h3>
+                </div>
+            `;
+                statsContainer.innerHTML = '';
+                return;
+            }
+
+            // Leaderboard view
+            leaderboardContainer.innerHTML = `
+            <div class="leaderboard-list">
+                ${mentors.map((mentor, index) => `
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank">${index + 1}</div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${mentor.name}</div>
+                            <div class="leaderboard-stats">
+                                ${mentor.total_students} students • ${mentor.total_tasks} tasks • ${mentor.total_problems} problems
+                            </div>
+                        </div>
+                        <div class="leaderboard-score">
+                            <div class="score">${mentor.completed_tasks + mentor.solved_problems}</div>
+                            <div class="label">Completions</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+            // Detailed stats table
+            statsContainer.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mentor</th>
+                        <th>Students</th>
+                        <th>Tasks Created</th>
+                        <th>Problems Created</th>
+                        <th>Task Completions</th>
+                        <th>Problem Solutions</th>
+                        <th>Completion Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${mentors.map(mentor => {
+                const totalPossible = (mentor.total_tasks + mentor.total_problems) * mentor.total_students;
+                const totalCompleted = mentor.completed_tasks + mentor.solved_problems;
+                const completionRate = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
+
+                return `
+                            <tr>
+                                <td><strong>${mentor.name}</strong></td>
+                                <td>${mentor.total_students}</td>
+                                <td>${mentor.total_tasks}</td>
+                                <td>${mentor.total_problems}</td>
+                                <td>${mentor.completed_tasks}</td>
+                                <td>${mentor.solved_problems}</td>
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div style="flex: 1; height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; min-width: 60px;">
+                                            <div style="width: ${completionRate}%; height: 100%; background: var(--gradient-success);"></div>
+                                        </div>
+                                        <span style="font-size: 0.875rem;">${completionRate}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+            }).join('')}
+                </tbody>
+            </table>
+        `;
+        } catch (error) {
+            leaderboardContainer.innerHTML = '<p class="error">Failed to load leaderboard</p>';
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,548 @@
+{% extends "base.html" %}
+
+{% block title %}Aptitude Tests - Mentor Hub{% endblock %}
+
+{% block content %}
+<style>
+    .question-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+
+    .question-card .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .question-card .question-number {
+        font-weight: 600;
+        color: var(--primary-500);
+        font-size: 1rem;
+    }
+
+    .question-card .delete-btn {
+        background: var(--danger-500);
+        color: white;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .question-card .delete-btn:hover {
+        background: var(--danger-600);
+        transform: scale(1.1);
+    }
+
+    .question-card input,
+    .question-card select {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+    }
+
+    .question-card input:focus {
+        outline: none;
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .options-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin: 1rem 0;
+    }
+
+    .option-input-group {
+        position: relative;
+    }
+
+    .option-input-group label {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--primary-500);
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .option-input-group input {
+        padding-left: 48px !important;
+    }
+
+    .correct-answer-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .correct-answer-row label {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .correct-answer-row select {
+        max-width: 200px;
+        background: var(--success-500);
+        color: white;
+        font-weight: 500;
+    }
+
+    .add-question-btn {
+        width: 100%;
+        padding: 1rem;
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .add-question-btn:hover {
+        border-color: var(--primary-500);
+        color: var(--primary-500);
+        background: rgba(99, 102, 241, 0.05);
+    }
+
+    .modal-close-btn {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: var(--bg-tertiary);
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        font-size: 1.2rem;
+        transition: all 0.2s;
+        z-index: 10;
+    }
+
+    .modal-close-btn:hover {
+        background: var(--danger-500);
+        color: white;
+    }
+</style>
+
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                {% if session['role'] == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i> <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('admin_users') }}" class="nav-link">
+                    <i class="fas fa-users-cog"></i> <span>Users</span>
+                </a>
+                <a href="{{ url_for('admin_mentors') }}" class="nav-link">
+                    <i class="fas fa-chalkboard-teacher"></i> <span>Mentors</span>
+                </a>
+                <a href="{{ url_for('admin_students') }}" class="nav-link">
+                    <i class="fas fa-user-graduate"></i> <span>Students</span>
+                </a>
+                <div class="nav-section-title" style="margin-top: 1rem;">Content</div>
+                <a href="{{ url_for('admin_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i> <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('admin_problems') }}" class="nav-link">
+                    <i class="fas fa-code"></i> <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('admin_aptitude') }}" class="nav-link active">
+                    <i class="fas fa-clipboard-check"></i> <span>Aptitude Test</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('mentor_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i> <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('mentor_tasks') }}" class="nav-link">
+                    <i class="fas fa-tasks"></i> <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('mentor_problems') }}" class="nav-link">
+                    <i class="fas fa-code"></i> <span>Problems</span>
+                </a>
+                <a href="{{ url_for('mentor_aptitude') }}" class="nav-link active">
+                    <i class="fas fa-clipboard-check"></i> <span>Aptitude Test</span>
+                </a>
+                <a href="{{ url_for('mentor_leaderboard') }}" class="nav-link">
+                    <i class="fas fa-trophy"></i> <span>Leaderboard</span>
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" style="background: var(--gradient-info);">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">{{ session['role'].capitalize() }}</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <h1><i class="fas fa-clipboard-check"></i> Aptitude Tests</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="openModal('createTestModal')">
+                    <i class="fas fa-plus"></i> Create Test
+                </button>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-list"></i> Manage Tests</h2>
+                </div>
+                <div class="card-body table-container" id="testsTable">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="createTestModal">
+    <div class="modal"
+        style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; position: relative;">
+        <button class="modal-close-btn" onclick="closeModal('createTestModal')">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <div class="modal-header" style="padding-right: 60px;">
+            <h2><i class="fas fa-plus-circle"></i> Create Aptitude Test</h2>
+        </div>
+
+        <div class="modal-body" style="flex: 1; overflow-y: auto;">
+            <form id="createTestForm">
+                <div class="form-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-field">
+                        <label><i class="fas fa-heading"></i> Test Title</label>
+                        <input type="text" id="testTitle" placeholder="Enter test title..." required>
+                    </div>
+                    <div class="form-field">
+                        <label><i class="fas fa-clock"></i> Duration</label>
+                        <input type="number" id="testDuration" value="30" min="5" max="180" required>
+                    </div>
+                    <div class="form-field">
+                        <label><i class="fas fa-redo"></i> Attempts</label>
+                        <select id="attemptLimit">
+                            <option value="1" selected>1 Attempt</option>
+                            <option value="2">2 Attempts</option>
+                            <option value="3">3 Attempts</option>
+                            <option value="">Unlimited</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label><i class="fas fa-calendar-times"></i> End Time</label>
+                        <input type="datetime-local" id="testEndTime">
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label><i class="fas fa-align-left"></i> Description (Optional)</label>
+                    <textarea id="testDescription" rows="2" placeholder="Brief description of the test..."></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 1rem;">
+                    <h3 style="margin: 0;"><i class="fas fa-question-circle"></i> Questions</h3>
+                    <span id="questionCount" style="color: var(--text-muted);">0 questions</span>
+                </div>
+
+                <div id="questionsContainer"></div>
+
+                <button type="button" class="add-question-btn" onclick="addQuestion()">
+                    <i class="fas fa-plus"></i> Add New Question
+                </button>
+            </form>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('createTestModal')">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button class="btn btn-primary" onclick="createTest()">
+                <i class="fas fa-save"></i> Create Test
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let questionCounter = 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTests();
+        addQuestion(); // Add first question by default
+    });
+
+    function updateQuestionCount() {
+        const count = document.querySelectorAll('.question-card').length;
+        document.getElementById('questionCount').textContent = count + ' question' + (count !== 1 ? 's' : '');
+    }
+
+    function addQuestion() {
+        questionCounter++;
+        const container = document.getElementById('questionsContainer');
+        const div = document.createElement('div');
+        div.className = 'question-card';
+        div.dataset.id = questionCounter;
+
+        div.innerHTML = `
+            <div class="question-header">
+                <span class="question-number">Question #${questionCounter}</span>
+                <button type="button" class="delete-btn" onclick="removeQuestion(this)" title="Delete Question">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            
+            <input type="text" class="q-text" placeholder="Enter your question here..." required>
+            
+            <div class="options-grid">
+                <div class="option-input-group">
+                    <label>A</label>
+                    <input type="text" class="q-opt-0" placeholder="Option A" required>
+                </div>
+                <div class="option-input-group">
+                    <label>B</label>
+                    <input type="text" class="q-opt-1" placeholder="Option B" required>
+                </div>
+                <div class="option-input-group">
+                    <label>C</label>
+                    <input type="text" class="q-opt-2" placeholder="Option C" required>
+                </div>
+                <div class="option-input-group">
+                    <label>D</label>
+                    <input type="text" class="q-opt-3" placeholder="Option D" required>
+                </div>
+            </div>
+            
+            <div class="correct-answer-row">
+                <label><i class="fas fa-check-circle"></i> Correct Answer:</label>
+                <select class="q-correct">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                </select>
+            </div>
+        `;
+
+        container.appendChild(div);
+        updateQuestionCount();
+
+        // Scroll to new question
+        div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function removeQuestion(btn) {
+        const card = btn.closest('.question-card');
+        card.style.transform = 'scale(0.9)';
+        card.style.opacity = '0';
+        setTimeout(() => {
+            card.remove();
+            updateQuestionCount();
+            renumberQuestions();
+        }, 200);
+    }
+
+    function renumberQuestions() {
+        document.querySelectorAll('.question-card').forEach((card, idx) => {
+            card.querySelector('.question-number').textContent = `Question #${idx + 1}`;
+        });
+    }
+
+    async function loadTests() {
+        const container = document.getElementById('testsTable');
+        try {
+            const res = await fetch('/api/aptitude');
+            const data = await res.json();
+
+            if (data.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-clipboard-check"></i></div>
+                        <h3>No aptitude tests yet</h3>
+                        <p>Create your first test using the button above.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Questions</th>
+                            <th>Duration</th>
+                            <th>Ends At</th>
+                            <th>Submissions</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(test => {
+                let qCount = 0;
+                try { qCount = JSON.parse(test.questions).length; } catch (e) { }
+                return `
+                            <tr>
+                                <td><strong>${test.title}</strong></td>
+                                <td><span class="badge primary">${qCount} Qs</span></td>
+                                <td>${test.duration} mins</td>
+                                <td>${test.end_time ? new Date(test.end_time).toLocaleString() : '<span style="color: var(--text-muted)">No limit</span>'}</td>
+                                <td>${test.submissions_count || 0}/${test.total_students || 0}</td>
+                                <td><span class="status-badge ${test.is_active ? 'active' : 'inactive'}">${test.is_active ? 'Active' : 'Inactive'}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteTest(${test.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+            }).join('')}
+                    </tbody>
+                </table>
+            `;
+        } catch (e) {
+            container.innerHTML = '<p class="error">Error loading tests</p>';
+        }
+    }
+
+    async function createTest() {
+        const title = document.getElementById('testTitle').value.trim();
+        const desc = document.getElementById('testDescription').value.trim();
+        const duration = parseInt(document.getElementById('testDuration').value);
+
+        const qCards = document.querySelectorAll('.question-card');
+        const questions = [];
+
+        let valid = true;
+        qCards.forEach((card, idx) => {
+            const text = card.querySelector('.q-text').value.trim();
+            const opts = [
+                card.querySelector('.q-opt-0').value.trim(),
+                card.querySelector('.q-opt-1').value.trim(),
+                card.querySelector('.q-opt-2').value.trim(),
+                card.querySelector('.q-opt-3').value.trim()
+            ];
+            const correct = card.querySelector('.q-correct').value;
+
+            if (!text || opts.some(o => !o)) {
+                valid = false;
+                card.style.border = '2px solid var(--danger-500)';
+            } else {
+                card.style.border = '';
+                questions.push({ text, options: opts, correct: parseInt(correct) });
+            }
+        });
+
+        if (!title) {
+            showToast('error', 'Error', 'Please enter a test title.');
+            return;
+        }
+        if (!valid || questions.length === 0) {
+            showToast('error', 'Error', 'Please fill all question fields.');
+            return;
+        }
+
+        const endTimeInput = document.getElementById('testEndTime').value;
+        const endTime = endTimeInput ? endTimeInput.replace('T', ' ') : null;
+        const attemptLimit = document.getElementById('attemptLimit').value; // "1", "2", "3" or ""
+
+        try {
+            const res = await fetch('/api/aptitude', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    description: desc,
+                    duration,
+                    questions,
+                    end_time: endTime,
+                    attempt_limit: attemptLimit ? parseInt(attemptLimit) : null
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('success', 'Success', 'Test created successfully!');
+                closeModal('createTestModal');
+                document.getElementById('createTestForm').reset();
+                document.getElementById('questionsContainer').innerHTML = '';
+                questionCounter = 0;
+                addQuestion();
+                loadTests();
+            }
+        } catch (e) {
+            showToast('error', 'Error', 'Failed to create test');
+        }
+    }
+
+    async function deleteTest(id) {
+        if (!confirm('Are you sure you want to delete this test? All submissions will be lost.')) return;
+        await fetch(`/api/aptitude/${id}`, { method: 'DELETE' });
+        showToast('success', 'Deleted', 'Test removed.');
+        loadTests();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - Mentor Hub{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Mentor Hub</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main Menu</div>
+                <a href="{{ url_for('student_dashboard') }}" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('student_tasks') }}" class="nav-link active">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </a>
+                <a href="{{ url_for('student_assignments') }}" class="nav-link">
+                    <i class="fas fa-code"></i>
+                    <span>Assignments</span>
+                </a>
+                <a href="{{ url_for('student_aptitude') }}" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Aptitude Test</span>
+                </a>
+                <a href="{{ url_for('student_submissions') }}" class="nav-link">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>My Submissions</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">{{ session['user_name'][0] }}</div>
+                <div class="user-details">
+                    <div class="user-name">{{ session['user_name'] }}</div>
+                    <div class="user-role">Student</div>
+                </div>
+            </div>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-block btn-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="content-header">
+            <div>
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Tasks</h1>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="content-body">
+            <div id="tasksList">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Task Submission Modal -->
+<div class="modal-overlay" id="taskModal">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2 id="modalTaskTitle">Submit Task</h2>
+            <button class="modal-close" onclick="closeModal('taskModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div id="taskDescription"
+                style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="editor">
+                    <i class="fas fa-edit"></i> Text Editor
+                </button>
+                <button class="tab-btn" data-tab="file">
+                    <i class="fas fa-upload"></i> File Upload
+                </button>
+            </div>
+
+            <div class="tab-contents">
+                <div class="tab-content active" data-tab-content="editor">
+                    <div class="form-field">
+                        <label>Your Response</label>
+                        <textarea id="taskContent" rows="10" placeholder="Write your response here..."></textarea>
+                    </div>
+                </div>
+
+                <div class="tab-content" data-tab-content="file">
+                    <div class="file-upload" id="fileUpload">
+                        <input type="file" id="taskFile" accept=".txt,.pdf,.doc,.docx,.zip">
+                        <div class="file-upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="file-upload-text">
+                            <span>Click to upload</span> or drag and drop
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submission Result -->
+            <div id="submissionResult" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('taskModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitTask()" id="submitTaskBtn">
+                <i class="fas fa-paper-plane"></i> Submit
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentTaskId = null;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadTasks();
+        initTabs();
+        initFileUpload();
+    });
+
+    async function loadTasks() {
+        const container = document.getElementById('tasksList');
+
+        try {
+            const response = await fetch('/api/tasks');
+            const tasks = await response.json();
+
+            if (tasks.length === 0) {
+                container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-tasks"></i></div>
+                    <h3>No tasks available</h3>
+                    <p>Your mentor hasn't assigned any tasks yet.</p>
+                </div>
+            `;
+                return;
+            }
+
+            container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+                ${tasks.map(task => `
+                    <div class="card">
+                        <div class="card-body">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                                <h3 style="font-size: 1.125rem; font-weight: 600;">${task.title}</h3>
+                                ${task.submitted > 0 ? '<span class="status-badge accepted">Submitted</span>' : '<span class="status-badge pending">Pending</span>'}
+                            </div>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.6;">${truncateText(task.description, 150)}</p>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 0.875rem; color: var(--text-muted);">
+                                    <i class="fas fa-user"></i> ${task.mentor_name}
+                                </span>
+                                <button class="btn btn-primary btn-sm" onclick="openTaskModal(${task.id}, '${escapeHtml(task.title)}', '${escapeHtml(task.description)}')">
+                                    ${task.submitted > 0 ? 'Resubmit' : 'Submit'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        } catch (error) {
+            container.innerHTML = '<p class="error">Failed to load tasks</p>';
+        }
+    }
+
+    function openTaskModal(taskId, title, description) {
+        currentTaskId = taskId;
+        document.getElementById('modalTaskTitle').textContent = title;
+        document.getElementById('taskDescription').textContent = description;
+        document.getElementById('taskContent').value = '';
+        document.getElementById('taskFile').value = '';
+        document.getElementById('submissionResult').style.display = 'none';
+        document.querySelector('.file-upload-text').innerHTML = '<span>Click to upload</span> or drag and drop';
+        openModal('taskModal');
+    }
+
+    async function submitTask() {
+        const submitBtn = document.getElementById('submitTaskBtn');
+        const resultDiv = document.getElementById('submissionResult');
+
+        const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+        const content = document.getElementById('taskContent').value;
+        const fileInput = document.getElementById('taskFile');
+
+        if (activeTab === 'editor' && !content.trim()) {
+            showToast('error', 'Error', 'Please enter your response');
+            return;
+        }
+
+        if (activeTab === 'file' && !fileInput.files.length) {
+            showToast('error', 'Error', 'Please upload a file');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Evaluating...';
+
+        try {
+            const formData = new FormData();
+            formData.append('task_id', currentTaskId);
+            formData.append('submission_type', activeTab);
+
+            if (activeTab === 'editor') {
+                formData.append('content', content);
+            } else {
+                formData.append('file', fileInput.files[0]);
+            }
+
+            const response = await fetch('/api/submit-task', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = `submission-result ${result.status}`;
+                resultDiv.innerHTML = `
+                <div class="result-header">
+                    <div class="result-icon">
+                        <i class="fas fa-${result.status === 'accepted' ? 'check' : 'times'}"></i>
+                    </div>
+                    <div>
+                        <div class="result-title">${result.status === 'accepted' ? 'Accepted!' : 'Rejected'}</div>
+                    </div>
+                </div>
+                <div class="result-score">${result.score}/100</div>
+                <div class="result-feedback">${result.feedback}</div>
+            `;
+
+                showToast(result.status === 'accepted' ? 'success' : 'error',
+                    result.status === 'accepted' ? 'Submission Accepted!' : 'Submission Rejected',
+                    `Score: ${result.score}/100`);
+
+                loadTasks();
+            } else {
+                showToast('error', 'Error', result.message || 'Submission failed');
+            }
+        } catch (error) {
+            showToast('error', 'Error', 'Failed to submit task');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+</script>
+{% endblock %}
